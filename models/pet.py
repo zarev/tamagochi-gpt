@@ -1,15 +1,15 @@
 import json
 import cv2
 import random
-import config
-import openai
 import os
-import requests
-from PIL import Image
 from io import BytesIO
-import numpy as np
 from datetime import datetime
+
+import numpy as np
+from PIL import Image
+
 from screens.game_over_screen import GameOverScreen
+from utils import gemini_client
 
 class Pet:
     def __init__(self, name, health, hunger, emotion, chat_history=None, image_number=None, last_fed_time=None,last_play_time=None,last_chat_time=None):
@@ -38,23 +38,16 @@ class Pet:
         return animal_type, [char_1, char_2, char_3]
 
     def generate_image(self):
-        openai.api_key = config.API_KEY
-        response = openai.Image.create(
-            prompt=f"a 16 bit sprite-sheet like a tamagochi of a {self.animal_type} face with 6 frames and black background",
-            n=1,
-            size="1024x1024"
+        prompt = (
+            f"a 16 bit sprite-sheet like a tamagochi of a {self.animal_type} face with 6 frames "
+            "and black background"
         )
+        image_bytes = gemini_client.generate_image(prompt)
 
-        image_url = response['data'][0]['url']
-
-        # Faz o download da imagem
-        image_data = requests.get(image_url).content
-
-        # Salva a imagem na pasta pet_animations
-        image = Image.open(BytesIO(image_data))
+        image = Image.open(BytesIO(image_bytes))
         next_file_number = self.get_pet_number("assets/pet_animations")
         image.save(f"assets/pet_animations/pet_{next_file_number}.png")
-        
+
         self.generate_atlas_file(next_file_number)
 
         return next_file_number
@@ -206,19 +199,14 @@ class Pet:
         self.update_pet_status()
         self.save_info()
     
-    def generate_reaction(self,action):
-        reacton_prompt= self.chat_history + f"Como um {self.animal_type},Quando voce esta {self.status} Diga uma frase para quando o meu dono {action}. Respoda de forma {self.characteristics[0]}"
-        openai.api_key = config.API_KEY
-        response = openai.Completion.create(
-                engine="text-davinci-003",
-                prompt=reacton_prompt,
-                temperature=0.7,
-                max_tokens=40,
-                n=1,
-                stop=None
+    def generate_reaction(self, action):
+        reaction_prompt = (
+            self.chat_history
+            + f"Como um {self.animal_type}, quando voce esta {self.status} "
+            f"diga uma frase para quando o meu dono {action}. Responda de forma {self.characteristics[0]}"
         )
 
-        reaction = response.choices[0].text.strip()
+        reaction = gemini_client.generate_text(reaction_prompt)
         self.chat_history += f"Seu pet reagiu: {reaction}\n"
         self.save_info(self.chat_history)
         return reaction

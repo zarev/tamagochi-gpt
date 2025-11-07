@@ -1,5 +1,3 @@
-import config
-import openai
 from kivy.uix.screenmanager import Screen
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
@@ -11,6 +9,7 @@ from kivy.core.image import Atlas
 from datetime import datetime
 from screens.game_over_screen import GameOverScreen
 from kivy.clock import Clock
+from utils import gemini_client
 
 class PetScreen(Screen):
     def __init__(self, pet, **kwargs):
@@ -135,17 +134,8 @@ class PetScreen(Screen):
                 prompt = ""
             
             self.chat_history += f"{user_input}\n"
-            openai.api_key = config.API_KEY
             prompt += self.chat_history
-            response = openai.Completion.create(
-                engine="text-davinci-003",
-                prompt=prompt,
-                temperature=0.7,
-                max_tokens=40,
-                n=1,
-                stop=None
-            )
-            chat_response = response.choices[0].text.strip()
+            chat_response = gemini_client.generate_text(prompt)
             self.chat_history += f"{chat_response}\n"
             self.chat_input.disabled = True
             self.chat_input.opacity = 0

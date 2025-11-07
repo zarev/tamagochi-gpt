@@ -1,7 +1,4 @@
 from io import BytesIO
-import requests
-import config
-import openai
 from kivy.uix.screenmanager import Screen
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
@@ -9,6 +6,7 @@ from kivy.uix.label import Label
 from kivy.uix.image import Image
 from kivy.uix.textinput import TextInput
 from PIL import Image as PILImage
+from utils import gemini_client
 
 
 class GameOverScreen(Screen):
@@ -23,20 +21,13 @@ class GameOverScreen(Screen):
         self.add_widget(self.layout)
     
     def generate_dead_image(self, pet):
-        openai.api_key = config.API_KEY
-        response = openai.Image.create(
-            prompt=f"a 16 bit pixel art of dead a {pet.animal_type} like a tamagotchi on a black background",
-            n=1,
-            size="1024x1024"
+        prompt = (
+            f"a 16 bit pixel art of a dead {pet.animal_type} like a tamagotchi on a black background"
         )
 
-        image_url = response['data'][0]['url']
+        image_bytes = gemini_client.generate_image(prompt)
 
-        # Faz o download da imagem
-        image_data = requests.get(image_url).content
-
-        # Salva a imagem na pasta pet_animations
-        image = PILImage.open(BytesIO(image_data))
+        image = PILImage.open(BytesIO(image_bytes))
         img_path = ("assets/pet_animations/pet_dead.png")
         image.save(f"assets/pet_animations/pet_dead.png")
 
