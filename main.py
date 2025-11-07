@@ -1,66 +1,63 @@
-import os
 import json
-from kivy.app import App
-from kivy.uix.screenmanager import ScreenManager
-from kivy.uix.screenmanager import NoTransition
-from kivy.core.audio import SoundLoader
-from screens.adoption_screen import AdoptionScreen
-from screens.pet_screen import PetScreen
+import os
+from typing import Optional
+
+from rich.console import Console
+from rich.panel import Panel
+
 from models.pet import Pet
+from screens.adoption_screen import AdoptionScreen
+from screens.game_over_screen import GameOverScreen
+from screens.pet_screen import PetScreen
 
 
-class PetGameApp(App):
-    def build(self):
-        self.sm = ScreenManager(transition=NoTransition())
+class PetGameApp:
+    """Simple terminal application wrapper for the Tamagochi pet."""
 
-       # self.load_background_music()
+    def __init__(self, console: Console) -> None:
+        self.console = console
 
-        pet = self.load_pet_from_save_file()
-        if pet:
-            self.sm.add_widget(PetScreen(name='pet_screen', pet=pet))
-            self.sm.current = 'pet_screen'
-        else:
-            self.sm.add_widget(AdoptionScreen(name='adoption_screen'))
-            self.sm.current = 'adoption_screen'
+    def run(self) -> None:
+        self.console.print(Panel.fit("[bold magenta]Bem-vindo ao Tamagochi GPT![/]"))
+        pet = self._load_pet_from_save_file()
+        if pet is None:
+            adoption_screen = AdoptionScreen(self.console)
+            pet = adoption_screen.choose_pet()
+            if pet is None:
+                self.console.print("[yellow]Até a próxima![/]")
+                return
+        pet_screen = PetScreen(self.console, pet)
+        game_over = pet_screen.run()
+        if game_over:
+            GameOverScreen(self.console, pet).show()
+        self.console.print("[green]Jogo encerrado.[/]")
 
-        return self.sm
-
-    def load_background_music(self):
-        music_file_path = "assets/music/background_music.mp3"
-
-        if os.path.exists(music_file_path):
-            self.background_music = SoundLoader.load(music_file_path)
-            if self.background_music:
-                self.background_music.loop = True
-                self.background_music.play()
-
-    def load_pet_from_save_file(self):
+    def _load_pet_from_save_file(self) -> Optional[Pet]:
         save_file_path = "save_file.txt"
-
-        if os.path.exists(save_file_path):
-            with open(save_file_path, "r") as file:
-                pet_data = json.load(file)
-
-            pet_name = pet_data.get("name")
-            pet_animal_type = pet_data.get("animal_type")
-            pet_characteristics = pet_data.get("characteristics")
-            pet_health = pet_data.get("health")
-            pet_hunger = pet_data.get("hunger")
-            pet_emotion = pet_data.get("emotion")
-            pet_status = pet_data.get("status")
-            pet_image = pet_data.get("image_number")
-            pet_last_fed_time = pet_data.get("last_fed_time")
-            pet_last_play_time = pet_data.get("last_play_time")
-            last_chat_time = pet_data.get("last_chat_time")
-            pet_chat_history = pet_data.get("chat_history", "")
-
-            pet = Pet(pet_name, pet_health, pet_hunger, pet_emotion, chat_history=pet_chat_history, image_number=pet_image,last_fed_time=pet_last_fed_time,last_play_time=pet_last_play_time,last_chat_time=pet_last_play_time)
-            pet.animal_type = pet_animal_type  # Atribuir o tipo de animal carregado
-            pet.characteristics = pet_characteristics  # Atribuir as características carregadas
-
-            return pet
-        else:
+        if not os.path.exists(save_file_path):
             return None
 
-if __name__ == '__main__':
-    PetGameApp().run()
+        with open(save_file_path, "r", encoding="utf-8") as file:
+            pet_data = json.load(file)
+
+        pet = Pet(
+            pet_data.get("name", "Pet"),
+            pet_data.get("health", 100),
+            pet_data.get("hunger", 0),
+            pet_data.get("emotion", "feliz"),
+            chat_history=pet_data.get("chat_history", ""),
+            image_number=pet_data.get("image_number"),
+            last_fed_time=pet_data.get("last_fed_time"),
+            last_play_time=pet_data.get("last_play_time"),
+            last_chat_time=pet_data.get("last_chat_time"),
+        )
+        pet.animal_type = pet_data.get("animal_type", pet.animal_type)
+        pet.characteristics = pet_data.get("characteristics", pet.characteristics)
+        pet.status = pet_data.get("status", pet.status)
+        return pet
+
+
+if __name__ == "__main__":
+    console = Console()
+    app = PetGameApp(console)
+    app.run()

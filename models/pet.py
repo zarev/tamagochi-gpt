@@ -5,10 +5,8 @@ import os
 from io import BytesIO
 from datetime import datetime
 
-import numpy as np
 from PIL import Image
 
-from screens.game_over_screen import GameOverScreen
 from utils import gemini_client
 
 class Pet:
@@ -59,9 +57,6 @@ class Pet:
         img = cv2.imread(image_path)
         height, width, _ = img.shape
 
-        # Cria uma cópia da imagem para desenhar os retângulos de contorno (para fins de debug)
-        img_debug = img.copy()
-
         # Aplica pré-processamento para melhorar a detecção de contornos
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         blurred = cv2.GaussianBlur(gray, (5, 5), 0)
@@ -86,10 +81,7 @@ class Pet:
                 x, y, w, h = cv2.boundingRect(contour)
                 y = height - (y + h)  # Transforma a coordenada y para o sistema de referência do canto inferior esquerdo
                 data_dict[image_path][f"frame{frame_index}"] = [x, y, w, h]
-                frame_index += 1
-
-                # Desenha o retângulo na imagem de debug
-                cv2.rectangle(img_debug, (x, y), (x + w, y + h), (0, 255, 0), 2)
+        frame_index += 1
                 
 
         # Gera o caminho do arquivo de saída
@@ -99,10 +91,7 @@ class Pet:
         with open(output_file, 'w') as f:
             json.dump(data_dict, f, indent=4)
 
-        # Mostra a imagem de debug com os retângulos desenhados
-        cv2.imshow("Debug Image", img_debug)
 
-  
     def get_pet_number(self, directory_path):
         files = os.listdir(directory_path)
         max_number = 0
@@ -210,13 +199,6 @@ class Pet:
         self.chat_history += f"Seu pet reagiu: {reaction}\n"
         self.save_info(self.chat_history)
         return reaction
-
-    def check_status(self, dt):
-        if 'Morto' in self.pet.status:
-            self.manager.add_widget(GameOverScreen(self.pet, name='gameover'))
-            self.manager.current = 'gameover'
-            self.check_status_event.cancel()
-
 
     def save_info(self, chat_history=None):
         if chat_history is None:
