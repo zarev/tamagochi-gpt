@@ -1,9 +1,9 @@
 import json
-import cv2
 import random
 import os
 from io import BytesIO
 from datetime import datetime
+from collections import deque
 
 from PIL import Image
 
@@ -53,36 +53,58 @@ class Pet:
     def generate_atlas_file(self, image_number: int):
         image_path = os.path.abspath(f"assets/pet_animations/pet_{image_number}.png")
 
-        # Carrega a imagem
-        img = cv2.imread(image_path)
-        height, width, _ = img.shape
+        with Image.open(image_path).convert("L") as grayscale:
+            width, height = grayscale.size
+            pixels = grayscale.load()
+            mask = [[pixels[x, y] > 20 for x in range(width)] for y in range(height)]
 
-        # Aplica pré-processamento para melhorar a detecção de contornos
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-        ret, thresh = cv2.threshold(blurred, 150, 255, cv2.THRESH_BINARY)
+        visited = [[False] * width for _ in range(height)]
+        components = []
+        for y in range(height):
+            for x in range(width):
+                if not mask[y][x] or visited[y][x]:
+                    continue
+                queue = deque([(x, y)])
+                visited[y][x] = True
+                min_x = max_x = x
+                min_y = max_y = y
+                pixel_count = 0
+                while queue:
+                    cx, cy = queue.popleft()
+                    pixel_count += 1
+                    if cx < min_x:
+                        min_x = cx
+                    if cx > max_x:
+                        max_x = cx
+                    if cy < min_y:
+                        min_y = cy
+                    if cy > max_y:
+                        max_y = cy
+                    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                        nx, ny = cx + dx, cy + dy
+                        if 0 <= nx < width and 0 <= ny < height and mask[ny][nx] and not visited[ny][nx]:
+                            visited[ny][nx] = True
+                            queue.append((nx, ny))
 
+                component_width = max_x - min_x + 1
+                component_height = max_y - min_y + 1
+                bounding_area = component_width * component_height
+                if 25000 < bounding_area < 230000:
+                    atlas_y = height - (min_y + component_height)
+                    components.append(
+                        {
+                            "x": min_x,
+                            "y": atlas_y,
+                            "w": component_width,
+                            "h": component_height,
+                        }
+                    )
 
-        # Realiza detecção de contornos
-        contours, hierarchy = cv2.findContours(image=thresh, mode=cv2.RETR_TREE, method=cv2.CHAIN_APPROX_NONE)
+        components.sort(key=lambda item: item["x"])
 
-        # Define critérios de filtragem de contornos
-        min_contour_area = 25000  # Área mínima para considerar um contorno
-        max_contour_area = 230000 # Área máxima para considerar um contorno
-
-        # Cria um dicionário para armazenar os retângulos de contorno
         data_dict = {image_path: {}}
-
-        # Gera retângulos para cada contorno filtrado
-        frame_index = 1
-        for contour in contours:
-            area = cv2.contourArea(contour)
-            if min_contour_area < area < max_contour_area:
-                x, y, w, h = cv2.boundingRect(contour)
-                y = height - (y + h)  # Transforma a coordenada y para o sistema de referência do canto inferior esquerdo
-                data_dict[image_path][f"frame{frame_index}"] = [x, y, w, h]
-        frame_index += 1
-                
+        for idx, comp in enumerate(components, start=1):
+            data_dict[image_path][f"frame{idx}"] = [comp["x"], comp["y"], comp["w"], comp["h"]]
 
         # Gera o caminho do arquivo de saída
         output_file = "utils/data/animation_mapping.atlas"
