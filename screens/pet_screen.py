@@ -22,58 +22,58 @@ class PetScreen:
         while True:
             self.pet.update_pet_status()
             self._render_status()
-            if "Morto" in self.pet.status:
+            if "Deceased" in self.pet.status:
                 return True
 
             action = Prompt.ask(
-                "Escolha uma ação",
-                choices=["alimentar", "injeção", "brincar", "conversar", "sair"],
-                default="alimentar",
+                "Choose an action",
+                choices=["feed", "injection", "play", "chat", "exit"],
+                default="feed",
             )
-            if action == "alimentar":
+            if action == "feed":
                 self._handle_feed()
-            elif action == "injeção":
+            elif action == "injection":
                 self._handle_injection()
-            elif action == "brincar":
+            elif action == "play":
                 self._handle_play()
-            elif action == "conversar":
+            elif action == "chat":
                 self._handle_chat()
-            elif action == "sair":
-                self.console.print("[cyan]Até logo![/]")
+            elif action == "exit":
+                self.console.print("[cyan]See you soon![/]")
                 return False
 
     def _render_status(self) -> None:
-        table = Table(title=f"Status de {self.pet.name}")
-        table.add_column("Indicador", style="bold")
-        table.add_column("Valor")
-        table.add_row("Saúde", str(self.pet.health))
-        table.add_row("Fome", str(self.pet.hunger))
-        table.add_row("Emoção", self.pet.emotion)
+        table = Table(title=f"{self.pet.name}'s Status")
+        table.add_column("Indicator", style="bold")
+        table.add_column("Value")
+        table.add_row("Health", str(self.pet.health))
+        table.add_row("Hunger", str(self.pet.hunger))
+        table.add_row("Emotion", self.pet.emotion)
         table.add_row("Status", ", ".join(self.pet.status) if self.pet.status else "Normal")
         self.console.print(table)
 
     def _handle_feed(self) -> None:
         self.pet.feed()
-        reaction = self.pet.generate_reaction("te alimenta")
+        reaction = self.pet.generate_reaction("feeds you")
         self.console.print(f"[green]Pet:[/] {reaction}")
 
     def _handle_injection(self) -> None:
         self.pet.give_injection()
-        reaction = self.pet.generate_reaction("te da uma injecao")
+        reaction = self.pet.generate_reaction("gives you an injection")
         self.console.print(f"[green]Pet:[/] {reaction}")
 
     def _handle_play(self) -> None:
         self.pet.play()
-        reaction = self.pet.generate_reaction("brinca com voce")
+        reaction = self.pet.generate_reaction("plays with you")
         self.console.print(f"[green]Pet:[/] {reaction}")
 
     def _handle_chat(self) -> None:
-        user_input = Prompt.ask("O que você diz ao seu pet?", default="")
+        user_input = Prompt.ask("What do you say to your pet?", default="")
         if not user_input.strip():
-            self.console.print("[yellow]Nenhuma mensagem enviada.[/]")
+            self.console.print("[yellow]No message sent.[/]")
             return
         history_was_empty = not (self.pet.chat_history or "").strip()
-        self._append_chat_history(f"Você: {user_input}\n")
+        self._append_chat_history(f"You: {user_input}\n")
         if history_was_empty:
             combined_prompt = f"{self.pet.generate_prompt()}\n{self.pet.chat_history}".strip()
         else:

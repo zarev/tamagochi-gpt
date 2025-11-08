@@ -20,8 +20,8 @@ class GameOverScreen:
     def show(self) -> None:
         image_path = self._generate_dead_image()
         message = (
-            f"Seu pet {self.pet.name} infelizmente faleceu.\n"
-            f"Uma imagem de despedida foi salva em: {image_path}"
+            f"Your pet {self.pet.name} unfortunately passed away.\n"
+            f"A farewell image was saved to: {image_path}"
         )
         self.console.print(Panel.fit(message, title="Game Over", style="red"))
 

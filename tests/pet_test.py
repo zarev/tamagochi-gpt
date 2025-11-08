@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, ANY
 from models.pet import Pet
 
 class TestPet(unittest.TestCase):
@@ -23,31 +23,32 @@ class TestPet(unittest.TestCase):
 
     def test_update_pet_status(self):
         self.pet.update_pet_status()
-        self.assertEqual(self.pet.status, 'Feliz')
+        self.assertIn('Healthy', self.pet.status)
 
         self.pet.hunger = 12
         self.pet.update_pet_status()
-        self.assertEqual(self.pet.status, 'Faminto')
+        self.assertIn('Hungry', self.pet.status)
 
         self.pet.hunger = 10
         self.pet.health = 49
         self.pet.update_pet_status()
-        self.assertEqual(self.pet.status, 'Doente')
+        self.assertIn('Sick', self.pet.status)
+        self.assertNotIn('Healthy', self.pet.status)
 
     def test_feed(self):
         self.pet.feed()
         self.assertEqual(self.pet.hunger, 0)
-        self.assertEqual(self.pet.status, 'Feliz')
+        self.assertIn('Full', self.pet.status)
 
     def test_give_injection(self):
         self.pet.give_injection()
         self.assertEqual(self.pet.health, 100)
-        self.assertEqual(self.pet.status, 'Feliz')
+        self.assertIn('Healthy', self.pet.status)
 
     def test_play(self):
         self.pet.play()
-        self.assertEqual(self.pet.emotion, 'Feliz')
-        self.assertEqual(self.pet.status, 'Feliz')
+        self.assertEqual(self.pet.emotion, 'happy')
+        self.assertIn('Healthy', self.pet.status)
 
     def test_save_info(self):
         with patch('models.pet.json') as mock_json, \
@@ -64,8 +65,11 @@ class TestPet(unittest.TestCase):
                 'health': 100,
                 'hunger': 10,
                 'emotion': 'happy',
-                'status': '',
+                'status': [],
                 'image_number': self.pet.image,
+                'last_fed_time': ANY,
+                'last_play_time': ANY,
+                'last_chat_time': ANY,
                 'chat_history': 'New chat history'
             }, mock_file)
 

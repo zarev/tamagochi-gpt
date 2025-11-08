@@ -18,19 +18,19 @@ class PetGameApp:
         self.console = console
 
     def run(self) -> None:
-        self.console.print(Panel.fit("[bold magenta]Bem-vindo ao Tamagochi GPT![/]"))
+        self.console.print(Panel.fit("[bold magenta]Welcome to Tamagochi GPT![/]"))
         pet = self._load_pet_from_save_file()
         if pet is None:
             adoption_screen = AdoptionScreen(self.console)
             pet = adoption_screen.choose_pet()
             if pet is None:
-                self.console.print("[yellow]Até a próxima![/]")
+                self.console.print("[yellow]See you next time![/]")
                 return
         pet_screen = PetScreen(self.console, pet)
         game_over = pet_screen.run()
         if game_over:
             GameOverScreen(self.console, pet).show()
-        self.console.print("[green]Jogo encerrado.[/]")
+        self.console.print("[green]Game finished.[/]")
 
     def _load_pet_from_save_file(self) -> Optional[Pet]:
         save_file_path = "save_file.txt"
@@ -44,7 +44,7 @@ class PetGameApp:
             pet_data.get("name", "Pet"),
             pet_data.get("health", 100),
             pet_data.get("hunger", 0),
-            pet_data.get("emotion", "feliz"),
+            pet_data.get("emotion", "happy"),
             chat_history=pet_data.get("chat_history", ""),
             image_number=pet_data.get("image_number"),
             last_fed_time=pet_data.get("last_fed_time"),
@@ -53,7 +53,8 @@ class PetGameApp:
         )
         pet.animal_type = pet_data.get("animal_type", pet.animal_type)
         pet.characteristics = pet_data.get("characteristics", pet.characteristics)
-        pet.status = pet_data.get("status", pet.status)
+        pet.status = Pet.normalize_statuses(pet_data.get("status", pet.status))
+        pet.chat_history = Pet.clean_chat_history(pet.chat_history)
         return pet
 
 

@@ -9,6 +9,22 @@ from PIL import Image
 
 from utils import gemini_client
 
+
+LEGACY_STATUS_TRANSLATIONS = {
+    'Faminto': 'Hungry',
+    'Saudavel': 'Healthy',
+    'Doente': 'Sick',
+    'Entediado': 'Bored',
+    'Triste': 'Sad',
+    'Morto': 'Deceased',
+    'Nao querendo comer': 'Full',
+}
+
+LEGACY_CHAT_REPLACEMENTS = {
+    'Seu pet reagiu:': 'Your pet reacted:',
+    'O peixe é eficiente. Repõe o que faltava e garante a energia para nadar e estar pronto para o próximo mergulho.': 'Fish is efficient. It replenishes what was missing and keeps you energized to swim and be ready for the next dive.',
+}
+
 class Pet:
     def __init__(self, name, health, hunger, emotion, chat_history=None, image_number=None, last_fed_time=None,last_play_time=None,last_chat_time=None):
         self.name = name
@@ -26,9 +42,9 @@ class Pet:
 
     def get_animal_and_characteristics(self):
         with open('utils/data/animal_types.json', encoding='utf-8') as f:
-            animals = json.load(f)['Portuguese']
+            animals = json.load(f)['English']
         with open('utils/data/personality_traits.json', encoding='utf-8') as f:
-            characteristics = json.load(f)['Portuguese']
+            characteristics = json.load(f)['English']
 
         animal_type = random.choice(animals)
         char_1, char_2, char_3 = random.sample(characteristics, 3)
@@ -106,10 +122,10 @@ class Pet:
         for idx, comp in enumerate(components, start=1):
             data_dict[image_path][f"frame{idx}"] = [comp["x"], comp["y"], comp["w"], comp["h"]]
 
-        # Gera o caminho do arquivo de saída
+        # Output atlas file path
         output_file = "utils/data/animation_mapping.atlas"
 
-        # Escreve o dicionário como um arquivo JSON
+        # Write atlas data to disk as JSON for the animation player
         with open(output_file, 'w') as f:
             json.dump(data_dict, f, indent=4)
 
@@ -118,24 +134,27 @@ class Pet:
         files = os.listdir(directory_path)
         max_number = 0
         for file in files:
-            # Apenas considera arquivos que começam com "pet_" e terminam com ".png"
+            # Only consider files that match the generated pet sprite naming convention
             if file.startswith("pet_") and file.endswith(".png"):
                 try:
                     number = int(file.replace("pet_", "").replace(".png", ""))
                     if number > max_number:
                         max_number = number
                 except ValueError:
-                    # Ignora arquivos que não seguem o formato esperado
+                    # Skip files that do not follow the expected naming pattern
                     continue
         return max_number + 1
     
     def generate_prompt(self):
-        return (f"Você é um pet virtual como um tamagochi seu nome é {self.name}. "
-                f"Você é do tipo {self.animal_type} eu tenho a responsabilidade de cuidar de você. "
-                f"Suas características são {self.characteristics[0]}, {self.characteristics[1]} e também bastante {self.characteristics[2]}. "
-                f"Atue com um pet virtual de acordo com essas características.")
+        return (
+            f"You are a virtual pet similar to a Tamagotchi and your name is {self.name}. "
+            f"You are a {self.animal_type} and I am responsible for taking care of you. "
+            f"Your personality traits are {self.characteristics[0]}, {self.characteristics[1]}, and {self.characteristics[2]}. "
+            f"Role-play as a virtual pet that embodies those traits."
+        )
 
     def update_pet_status(self):
+        self.status = self.normalize_statuses(self.status)
         current_time = datetime.now()
 
         last_fed_time_datetime = datetime.strptime(self.last_fed_time, "%Y-%m-%dT%H:%M:%S.%f") if isinstance(self.last_fed_time, str) else self.last_fed_time
@@ -151,76 +170,99 @@ class Pet:
             self.health = max(self.health, 0)
 
         if self.hunger > 11:
-            if 'Faminto' not in self.status:
-                self.status.append('Faminto')
+            if 'Hungry' not in self.status:
+                self.status.append('Hungry')
         else:
-            if 'Faminto' in self.status:
-                self.status.remove('Faminto')
+            if 'Hungry' in self.status:
+                self.status.remove('Hungry')
 
         if self.health > 70:
-            if 'Saudavel' not in self.status:
-                self.status.append('Saudavel')
+            if 'Healthy' not in self.status:
+                self.status.append('Healthy')
         else:
-            if 'Saudavel' in self.status:
-                self.status.remove('Saudavel')
+            if 'Healthy' in self.status:
+                self.status.remove('Healthy')
 
         if self.hunger == 0:
-            if 'Nao querendo comer' not in self.status:
-                self.status.append('Nao querendo comer')
+            if 'Full' not in self.status:
+                self.status.append('Full')
         else:
-            if 'Nao querendo comer' in self.status:
-                self.status.remove('Nao querendo comer')
+            if 'Full' in self.status:
+                self.status.remove('Full')
 
         if self.health < 50:
-            if 'Doente' not in self.status:
-                self.status.append('Doente')
-            if (current_time - last_fed_time_datetime).total_seconds() > 48*60*60:  # Se passou mais de 48 horas
-                if 'Morto' not in self.status:
-                    self.status.append('Morto')
+            if 'Sick' not in self.status:
+                self.status.append('Sick')
+            if (current_time - last_fed_time_datetime).total_seconds() > 48*60*60:  # More than 48 hours without food
+                if 'Deceased' not in self.status:
+                    self.status.append('Deceased')
         else:
-            if 'Doente' in self.status:
-                self.status.remove('Doente')
+            if 'Sick' in self.status:
+                self.status.remove('Sick')
 
-        if (current_time - last_play_time_datetime).total_seconds() > 4*60*60:  # Se passou mais de 4 horas
-            if 'Entediado' not in self.status:
-                self.status.append('Entediado')
+        if (current_time - last_play_time_datetime).total_seconds() > 4*60*60:  # More than 4 hours without playtime
+            if 'Bored' not in self.status:
+                self.status.append('Bored')
         else:
-            if 'Entediado' in self.status:
-                self.status.remove('Entediado')
+            if 'Bored' in self.status:
+                self.status.remove('Bored')
 
-        if (current_time - last_chat_time_datetime).total_seconds() > 4*60*60:  # Se passou mais de 4 horas
-            if 'Triste' not in self.status:
-                self.status.append('Triste')
+        if (current_time - last_chat_time_datetime).total_seconds() > 4*60*60:  # More than 4 hours without chatting
+            if 'Sad' not in self.status:
+                self.status.append('Sad')
         else:
-            if 'Triste' in self.status:
-                self.status.remove('Triste')
+            if 'Sad' in self.status:
+                self.status.remove('Sad')
 
     def feed(self):
         self.hunger = max(0, self.hunger - 10)
+        self.emotion = 'happy'
         self.last_fed_time = datetime.now()
         self.update_pet_status()
         self.save_info()
 
     def give_injection(self):
         self.health = min(100, self.health + 10)
+        self.emotion = 'happy'
+        self.update_pet_status()
         self.save_info()
 
     def play(self):
+        self.emotion = 'happy'
         self.last_play_time = datetime.now()
         self.update_pet_status()
         self.save_info()
     
     def generate_reaction(self, action):
+        status_description = ", ".join(self.status) if self.status else "content"
         reaction_prompt = (
-            self.chat_history
-            + f"Como um {self.animal_type}, quando voce esta {self.status} "
-            f"diga uma frase para quando o meu dono {action}. Responda de forma {self.characteristics[0]}"
+            f"{self.chat_history}"
+            f"As a {self.animal_type} who currently feels {status_description}, "
+            f"say something when your owner {action}. Respond in a {self.characteristics[0].lower()} tone."
         )
 
         reaction = gemini_client.generate_text(reaction_prompt)
-        self.chat_history += f"Seu pet reagiu: {reaction}\n"
+        self.chat_history += f"Your pet reacted: {reaction}\n"
         self.save_info(self.chat_history)
         return reaction
+
+    @classmethod
+    def normalize_statuses(cls, statuses):
+        normalized = []
+        for status in statuses or []:
+            english = LEGACY_STATUS_TRANSLATIONS.get(status, status)
+            if english not in normalized:
+                normalized.append(english)
+        return normalized
+
+    @classmethod
+    def clean_chat_history(cls, chat_history):
+        if not chat_history:
+            return ""
+        cleaned = chat_history
+        for old, new in LEGACY_CHAT_REPLACEMENTS.items():
+            cleaned = cleaned.replace(old, new)
+        return cleaned
 
     def save_info(self, chat_history=None):
         if chat_history is None:
